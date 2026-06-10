@@ -20,55 +20,113 @@ There's no schedule and no waiting — it runs **only when you ask it to**.
 
 ---
 
-## How it works (the simple version)
+## How it works — step by step
 
-When you say **"wake up Jarvis"**, here's what happens behind the scenes:
+When you say **"wake up Jarvis"**, it runs a 6-stage assembly line. The diagram shows each
+stage; the notes underneath explain **what** it does and **how** it does it.
 
 ```
-                        You say: "wake up Jarvis"
-                                   │
-                                   ▼
-        ┌───────────────────────────────────────────────┐
-        │  STEP 1 — Your favourite companies             │
-        │  Checks the company list you keep              │
-        │  (a file called sponsors.yaml)                 │
-        └───────────────────────┬───────────────────────┘
-                                 │  found some jobs
-                                 ▼
-        ┌───────────────────────────────────────────────┐
-        │  STEP 2 — The wider internet                   │
-        │  Searches the open web for more jobs           │
-        │  (only enough to top up to 30)                 │
-        └───────────────────────┬───────────────────────┘
-                                 │  more jobs
-                                 ▼
-        ┌───────────────────────────────────────────────┐
-        │  THE FILTER — every job checked one by one:    │
-        │     ✓ matches your résumé                      │
-        │     ✓ posted in the last 14 days               │
-        │     ✓ located in the US                        │
-        │     ✓ not a duplicate                          │
-        │     ✓ the Apply link really opens              │
-        │  (anything that fails is thrown away)          │
-        └───────────────────────┬───────────────────────┘
-                                 ▼
-               ┌─────────────────────────────────────┐
-               │   Up to 30 BRAND-NEW jobs for today  │
-               └─────────────────────────────────────┘
-                                 +
-        Jobs from earlier days you haven't applied to yet
-                 (shown in a separate list below)
+                            You say: "wake up Jarvis"
+                                        │
+                                        ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ STAGE 0 — RE-CHECK YESTERDAY'S JOBS  (the jobs already on your list)    │
+  │ Re-opens each saved-but-not-applied job's link to see if it's still     │
+  │ live, and re-checks it still fits your résumé. Dead/closed ones are     │
+  │ marked closed; ones that no longer match are filed away.                │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                       ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ STAGE 1 — ASK YOUR COMPANIES DIRECTLY  (your sponsors.yaml list)        │
+  │ For every company on your list, Jarvis calls that company's official    │
+  │ jobs feed — the very system their careers page runs on — and downloads  │
+  │ all their currently-open roles, with real titles, dates and links.      │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                       │  still need more to reach 30?
+                                       ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ STAGE 2 — SEARCH THE WIDER WEB  (only to fill leftover slots)           │
+  │ Asks the Adzuna jobs service for postings that match your résumé        │
+  │ keywords, are in the US, and were posted in the last 14 days.           │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                       │  one big pile of candidate jobs
+                                       ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ STAGE 3 — THE FILTER  (every single job is checked, one by one)         │
+  │   a) Real source?   came from a real jobs system, not an ad/redirect    │
+  │   b) Fresh?         posted within 14 days, using the real post date     │
+  │   c) Right role?    title matches your résumé's keywords                │
+  │   d) In the US?     location is the United States                       │
+  │   e) Eligible?      not clearance / citizens-only (visa-ineligible)     │
+  │   f) New to you?    not already somewhere on your list                  │
+  │   g) Link works?    Jarvis actually opens the Apply link to confirm     │
+  │   Fail any one → thrown out (and counted, so nothing is hidden)         │
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                       │  only the jobs that passed everything
+                                       ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ STAGE 4 — SORT & TRIM                                                   │
+  │ Newest first, your-companies ahead of web results, then keep the top 30.│
+  └───────────────────────────────────┬────────────────────────────────────┘
+                                       ▼
+  ┌────────────────────────────────────────────────────────────────────────┐
+  │ STAGE 5 — HAND IT TO YOU + REMEMBER IT                                  │
+  │ Shows up to 30 brand-new jobs, plus the still-open carryover in a       │
+  │ separate list, and saves everything so next time it knows what you've   │
+  │ already seen.                                                           │
+  └────────────────────────────────────────────────────────────────────────┘
 ```
 
-**Two simple rules to remember:**
+### What each stage does, and how
 
-1. **Your own company list comes first.** Jarvis fills today's 30 from your saved companies
-   first, then uses the wider web only to fill whatever's left over.
-2. **You always get up to 30 *new* jobs.** Jobs from previous days that you haven't applied
-   to yet are kept and shown in a *separate* list underneath — they never use up your 30.
-   As you apply to them (or they get filled and close), they drop off on their own.
+**Stage 0 — Re-check yesterday's jobs (carryover).**
+*What:* keeps your earlier finds honest so you're never sent to a job that's already gone.
+*How:* it takes every job you saved but haven't marked "applied," opens each Apply link to
+confirm it still loads, and re-runs it through your résumé filter. Links that no longer load
+are marked **closed**; jobs that no longer match are **archived**. The rest stay as "still
+open" and appear in the separate carryover list at the bottom.
 
-If a day only has 12 good jobs, you get 12. Jarvis never pads the list with junk to hit 30.
+**Stage 1 — Ask your companies directly.**
+*What:* gets jobs straight from the companies you care about — first, and most reliably.
+*How:* each company on your list publishes its openings through an "ATS" (the hiring software
+behind its careers page — Greenhouse, Lever, Ashby or Workday). Jarvis asks that software
+directly for the company's current openings, so it gets the **real** job title, the **real**
+posting date, and a **real** apply link — not a guess scraped off a search engine.
+
+**Stage 2 — Search the wider web.**
+*What:* casts a net beyond your own list, but only enough to top the day up to 30.
+*How:* it sends your résumé keywords to the **Adzuna** jobs service (a search engine just for
+jobs) and asks only for US postings from the last 14 days. This runs **only if** Stage 1
+didn't already produce 30, and only fills the slots that are left.
+
+**Stage 3 — The filter (the important part).**
+*What:* this is where false, stale, foreign, off-target, or dead jobs get removed — every job
+is inspected on its own.
+*How:* each candidate must pass seven quick checks (real source, ≤14 days old, title matches
+your role, US location, visa-eligible, not a duplicate, and — last — Jarvis literally opens
+the Apply link to make sure it works). The moment a job fails one check it's dropped, and the
+reason is tallied so you can see exactly why on the scoreboard. Nothing is silently discarded.
+
+**Stage 4 — Sort & trim.**
+*What:* puts the best jobs at the top and caps the list at 30.
+*How:* survivors are ordered newest-first, with your own companies ranked ahead of web finds,
+then the top 30 are kept.
+
+**Stage 5 — Hand it to you and remember it.**
+*What:* shows you the result and makes sure tomorrow doesn't repeat today.
+*How:* it prints up to 30 brand-new jobs (with a small scoreboard of what was rejected and
+why), lists the still-open carryover separately underneath, and saves every new job to your
+tracker so it's never shown to you twice.
+
+### Two rules worth remembering
+
+1. **Your own company list comes first.** The 30 are filled from your saved companies before
+   the web is even touched; the web only tops up the remainder.
+2. **You always get up to 30 *brand-new* jobs.** Carryover (older jobs you haven't applied to)
+   is shown in a *separate* list and never uses up your 30. As you apply to them — or they get
+   filled and close — they drop off on their own.
+
+If a day only has 12 good jobs, you get 12. Jarvis never pads the list with junk to reach 30.
 
 ---
 
