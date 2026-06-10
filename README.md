@@ -293,9 +293,12 @@ Just talk to it. Here's everything you can say:
 
 ## Understanding what Jarvis shows you
 
-Every run gives you a clean, scannable report. Here's a **complete example** of what one
-`daily_jobs` run looks like (inside Claude Desktop it renders as nicely formatted text —
-clickable links, bold titles, the table laid out):
+Every run gives you a clean, scannable report. Here's an **actual run** (real jobs pulled
+live from the sponsor feeds, using the default DevOps/SRE filter):
+
+![Example of a daily_jobs run rendered in Claude Desktop](docs/example-digest.png)
+
+And the same kind of output written out as text, so you can see the full structure:
 
 ```text
 # Jarvis Daily — 2026-06-10
