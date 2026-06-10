@@ -28,6 +28,7 @@ import yaml
 from mcp.server.fastmcp import FastMCP
 
 import jarvis_sourcing as src
+import web_sourcing as web
 
 BASE_DIR = Path(__file__).parent
 JOBS_DIR = BASE_DIR / "jobs"
@@ -71,8 +72,11 @@ def _load_tracker() -> list[dict]:
             if r.get(fld) is None:
                 r[fld] = ""
                 migrated = True
-        # one-time archive of rows from banned sources (linkedin/dice/bing/...)
-        if r["status"] == "not_applied" and not src.allowed_domain(r["link"]):
+        # one-time archive of UNTAGGED legacy rows from banned sources
+        # (linkedin/dice/bing/...). Rows with an `ats` tag — including
+        # web-search finds (ats="web") — are legitimate and never touched.
+        if (r["status"] == "not_applied" and not r.get("ats")
+                and not src.allowed_domain(r["link"])):
             r["status"] = "archived"
             r["notes"] = (r["notes"] + " | " if r["notes"] else "") + "legacy junk source"
             migrated = True
@@ -230,6 +234,73 @@ def find_jobs() -> str:
 
     digest = "\n".join(lines)
     with open(JOBS_DIR / f"{today}_jobs.md", "w") as f:
+        f.write(digest + "\n")
+    return digest
+
+
+@mcp.tool()
+def search_web_jobs() -> str:
+    """
+    Internet-wide job search — SEPARATE from the ATS find_jobs. Scans jobs across
+    the web via the Adzuna API, keeps only those that match YOUR RESUME PROFILE,
+    were posted within max_age_days, are US-based, and — critically —
+    liveness-checks EVERY apply link before delivering (dead/false links are
+    dropped, not shown). New finds are added to the tracker tagged source 'web'.
+    Requires ADZUNA_APP_ID + ADZUNA_APP_KEY in the environment (free key at
+    https://developer.adzuna.com). Trigger: 'search the web' / 'wide search'.
+    """
+    rows = _load_tracker()
+    profile = src.load_profile()
+    today = TODAY()
+
+    try:
+        cands = web.search_adzuna(profile, max_days=profile["max_age_days"])
+    except RuntimeError as e:
+        return (f"⛔ {e}.\nGet a free key at https://developer.adzuna.com and add it to "
+                "claude_desktop_config.json:\n"
+                '    "env": { "ADZUNA_APP_ID": "...", "ADZUNA_APP_KEY": "..." }')
+
+    prior = {src.canonical(r["link"]) for r in rows if r.get("link")}
+    sess = src.new_session()
+    delivered, st = web.verify_and_gate(cands, prior, profile, sess)
+    delivered = delivered[:DAILY_CAP]
+
+    new_start = len(rows)
+    for c in delivered:
+        rows.append({
+            "date_found": today, "title": c["title"], "company": c["company"],
+            "location": c["location"], "link": c["url"], "status": "not_applied",
+            "date_applied": "", "notes": "web search",
+            "posted_at": c["posted"].strftime("%Y-%m-%d") if c["posted"] else "",
+            "ats": "web", "employer_type": "direct",
+            "apply_mode": "manual", "resume_file": "",
+        })
+    _save_tracker(rows)
+
+    role_note = "" if PROFILE_FILE.exists() else \
+        "  _(default filter — run setup_profile with your resume to personalize)_"
+    stat_lines = [
+        f"| Fetched from web (Adzuna) | {st['fetched']} |",
+        f"| Rejected: older than {profile['max_age_days']}d / no date | {st['rej_stale']} |",
+        f"| Rejected: title mismatch | {st['rej_title']} |",
+        f"| Rejected: non-US | {st['rej_location']} |",
+        f"| Rejected: clearance/eligibility | {st['rej_eligibility']} |",
+        f"| Rejected: duplicate (vs tracker/batch) | {st['rej_duplicate']} |",
+        f"| Rejected: DEAD LINK (failed verification) | {st['rej_dead']} |",
+        f"| **Delivered (every link verified live)** | **{len(delivered)}** |",
+    ]
+    lines = [f"# Jarvis Web Search — {today}", "",
+             f"**Target role:** {profile.get('target_role', '—')}{role_note}", "",
+             "| Pipeline | Count |", "|---|---|", *stat_lines, "", "---", ""]
+    if delivered:
+        lines.append(f"## 🌐 New from the web ({len(delivered)}) — every link checked live\n")
+        for k in range(len(delivered)):
+            lines += _fmt_row(new_start + k + 1, rows[new_start + k])
+    else:
+        lines.append("Nothing survived verification today. No dead links, no padding.")
+
+    digest = "\n".join(lines)
+    with open(JOBS_DIR / f"{today}_web_jobs.md", "w") as f:
         f.write(digest + "\n")
     return digest
 

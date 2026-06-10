@@ -81,12 +81,29 @@ Each day (`find_jobs` / "wake up Jarvis"):
 | Tool | What it does |
 |------|--------------|
 | `setup_profile` | Reads your résumé, derives your role filter → `profile.yaml`. **Run this first.** |
-| `find_jobs` | The daily pipeline above. Trigger: *"wake up Jarvis."* |
+| `find_jobs` | The daily ATS pipeline above (your curated company list). Trigger: *"wake up Jarvis."* |
+| `search_web_jobs` | **Internet-wide** search via the Adzuna API — *separate* from `find_jobs`. Same quality bar (profile-matched, ≤ `max_age_days`, US, deduped) and **every apply link is liveness-checked before delivery**. Needs `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`. Trigger: *"search the web."* |
 | `list_jobs` | List tracker rows (`today` / `all` / `pending` / a date). |
 | `mark_applied(n)` | Mark tracker row #n applied. |
 | `get_stats` | Totals, per-day found/applied, pipeline health. |
 | `open_digest` | Path to a day's Markdown digest. |
 | `tailor_resume(n)` | Generate a job-specific résumé DOCX for row #n (re-emphasis of real experience only — never fabricates). |
+
+---
+
+## Two search modes
+
+| | `find_jobs` (default) | `search_web_jobs` (opt-in) |
+|---|---|---|
+| Source | Your curated `sponsors.yaml` ATS feeds | The open web, via the Adzuna jobs API |
+| Reach | Exactly the companies you list | Internet-wide |
+| Junk control | Structurally clean (ATS-only) | Gated + **every link liveness-checked** |
+| Needs a key | No | Yes (free Adzuna key) |
+
+Both apply the **same** résumé-derived role filter, the same freshness/US/eligibility
+gates, the same dedup, and the same live-link verification — so the wide-net mode
+stays clean instead of dumping aggregator junk. Web finds land in the same tracker,
+tagged `ats: web`.
 
 ---
 
@@ -96,6 +113,8 @@ Each day (`find_jobs` / "wake up Jarvis"):
 - **Python 3.11+**
 - **Claude Desktop** (this runs as an MCP server it launches)
 - An **Anthropic API key** (only needed for `setup_profile` and `tailor_resume`)
+- *Optional:* a free **Adzuna API key** (`app_id` + `app_key` from
+  [developer.adzuna.com](https://developer.adzuna.com)) — only for `search_web_jobs`
 
 ### 1. Clone
 ```bash
@@ -121,7 +140,11 @@ a server. Point `command` at the venv's Python and `args` at `jarvis_mcp.py`:
     "jarvis": {
       "command": "/absolute/path/to/jarvis-job-agent/.venv/bin/python",
       "args": ["/absolute/path/to/jarvis-job-agent/jarvis_mcp.py"],
-      "env": { "ANTHROPIC_API_KEY": "sk-ant-..." }
+      "env": {
+        "ANTHROPIC_API_KEY": "sk-ant-...",
+        "ADZUNA_APP_ID": "...",
+        "ADZUNA_APP_KEY": "..."
+      }
     }
   }
 }
