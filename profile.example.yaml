@@ -28,8 +28,12 @@ title_exclude:
   - principal architect
 
 # Postings whose title/description require these are dropped (visa-ineligible).
+# "clearance"/"polygraph" are caught even bare, but "clearance not required" still passes.
 eligibility_exclude:
   - security clearance
+  - clearance
+  - polygraph
+  - public trust
   - ts/sci
   - us citizenship required
   - itar

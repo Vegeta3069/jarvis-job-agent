@@ -41,7 +41,8 @@ TITLE_EXCLUDE = ["intern", "manager", "director", "principal architect",
                  "equipment reliability", "plant reliability", "maintenance"]
 ELIGIBILITY_EXCLUDE = ["security clearance", "ts/sci", "top secret",
                        "us citizenship required", "u.s. citizenship", "itar",
-                       "active clearance"]
+                       "active clearance", "secret clearance", "public trust",
+                       "polygraph", "clearance"]
 US_HINTS = ["united states", "usa", ", us", "remote - us", "us remote",
             "remote (us", "u.s.", "us-remote", "remote, us"]
 US_STATE = re.compile(r",\s*[A-Z]{2}(\b|$)")          # "Austin, TX"
@@ -256,9 +257,21 @@ def _gate_location(loc: str) -> bool:
     return any(h in low for h in US_HINTS) or bool(US_STATE.search(loc))
 
 
+_ELIG_NOT_REQUIRED = re.compile(
+    r"\b(no|not|without|don'?t|do not|doesn'?t|isn'?t)\b[^.\n]{0,25}"
+    r"\b(clearance|polygraph|citizenship)\b"
+    r"|\b(clearance|polygraph|citizenship)\b[^.\n]{0,25}\bnot\b[^.\n]{0,12}"
+    r"\b(required|needed|necessary)\b")
+
+
 def _gate_eligibility(t: str, exclude: list[str]) -> bool:
+    """Reject clearance / citizenship / ITAR-gated roles (visa-ineligible for an
+    H-1B holder). A posting that explicitly says such a requirement is NOT needed
+    still passes — so 'clearance' is caught, but 'clearance not required' isn't."""
     t = t.lower()
-    return not any(x in t for x in exclude)
+    if not any(x in t for x in exclude):
+        return True
+    return bool(_ELIG_NOT_REQUIRED.search(t))
 
 
 def passes_content_gates(title: str, location: str, profile: dict | None = None) -> bool:
