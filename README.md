@@ -34,10 +34,10 @@ approach:
 fresh jobs from your **sponsor list** → top up from the **web** (Adzuna) until you have
 up to **30** jobs. Every job in the final list matches your résumé profile, was posted
 within `max_age_days`, is US-based, is de-duplicated, and has a **verified-live apply
-link**. Sponsors are filled first; the web only fills whatever slots remain. Carryover
-(jobs still open from earlier days) counts toward the 30 — as you mark jobs applied or
-reqs close, the freed slots refill with fresh finds. The two sections below describe the
-shared machinery each stage uses.
+link**. Sponsors fill the 30 first; the web fills whatever slots remain. Carryover (jobs
+still open from earlier days) is re-verified and shown in a **separate** section — it does
+*not* consume the 30, so you get up to **30 brand-new** jobs every day. The two sections
+below describe the shared machinery each stage uses.
 
 ```
          your résumé                    sponsors.yaml (curated companies)
@@ -109,7 +109,7 @@ without the dead links and aggregator junk that raw web scraping produces.
 | Tool | What it does |
 |------|--------------|
 | `setup_profile` | Reads your résumé, derives your role filter → `profile.yaml`. **Run this first.** |
-| `daily_jobs` | **The daily run.** Sponsor list first, then the web — merged into one deduped, link-verified list of up to **30 jobs/day**. Trigger: *"wake up Jarvis."* |
+| `daily_jobs` | **The daily run.** Up to **30 brand-new jobs/day** — sponsor list first, then the web, deduped + every link verified. Carryover shown separately (not counted in the 30). Trigger: *"wake up Jarvis."* |
 | `find_jobs` | Sponsor-list-only run (standalone variant of stage 1). |
 | `search_web_jobs` | Web-only run via the Adzuna API (standalone variant of stage 2). Needs `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`. |
 | `list_jobs` | List tracker rows (`today` / `all` / `pending` / a date). |
@@ -203,9 +203,9 @@ is what actually runs).
 
 **Every day**
 1. *"Wake up Jarvis"* (`daily_jobs`) — the combined run: sponsor list first, then the web,
-   merged into one deduped, link-verified list of up to **30** jobs; new ones added to the
-   tracker. *(Standalone variants if you want just one source: `find_jobs` = sponsors only,
-   `search_web_jobs` = web only.)*
+   giving up to **30 brand-new** jobs (deduped + every link verified); carryover from earlier
+   days is shown in a separate section, not counted in the 30. *(Standalone variants:
+   `find_jobs` = sponsors only, `search_web_jobs` = web only.)*
 2. *"List today's jobs"* / *"show pending"* (`list_jobs`) — numbered rows.
 3. *"Tailor my resume for #14"* (`tailor_resume(14)`) — writes a job-specific résumé DOCX
    into `resumes/` (re-emphasis of real experience only — never fabricated).

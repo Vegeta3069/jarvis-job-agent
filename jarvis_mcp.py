@@ -112,15 +112,15 @@ def _fmt_row(n: int, r: dict) -> list[str]:
 @mcp.tool()
 def daily_jobs() -> str:
     """
-    THE daily run — call this when the user says 'wake up Jarvis'. Produces ONE
-    merged list of up to 30 jobs, in this order:
-      1) re-verify carryover (still-open unapplied jobs already tracked)
-      2) fresh jobs from your sponsor list (sponsors.yaml ATS feeds)
-      3) fresh jobs from the web (Adzuna) to fill any remaining slots up to 30
-    Every job in the list matches your résumé profile, was posted within
-    max_age_days, is US-based, is de-duplicated, and has a verified-live apply
-    link. New finds are added to the tracker; a digest is written to
-    jobs/<date>_daily.md.
+    THE daily run — call this when the user says 'wake up Jarvis'. Delivers up to
+    30 BRAND-NEW jobs each day, sponsor list first then web:
+      1) sponsor list (sponsors.yaml ATS feeds) fills the 30 first
+      2) the web (Adzuna) fills whatever slots remain up to 30
+    Carryover (still-open unapplied jobs from earlier days) is re-verified and
+    shown SEPARATELY below the new list — it does NOT consume the 30 slots.
+    Every job matches your résumé profile, was posted within max_age_days, is
+    US-based, de-duplicated, and has a verified-live apply link. New finds are
+    added to the tracker; a digest is written to jobs/<date>_daily.md.
     """
     rows = _load_tracker()
     profile = src.load_profile()
@@ -156,7 +156,7 @@ def daily_jobs() -> str:
     carry_live = [i for i in survivors if rows[i]["link"] in alive]
 
     known = {src.canonical(r["link"]) for r in rows if r.get("link")}
-    room = max(0, DAILY_TARGET - len(carry_live))
+    room = DAILY_TARGET          # 30 brand-new; carryover is shown separately, not counted
 
     # 2) sponsor list first
     try:
@@ -207,24 +207,21 @@ def daily_jobs() -> str:
         })
     _save_tracker(rows)
 
-    delivered = len(carry_live) + len(ats_take) + len(web_take)
+    new_count = len(ats_take) + len(web_take)
     role_note = "" if PROFILE_FILE.exists() else \
         "  _(default filter — run setup_profile with your resume to personalize)_"
     stat_lines = [
-        f"| Carryover kept / closed / archived | {len(carry_live)} / {closed} / {regated} |",
         f"| Sponsors: sources ok/fail | {sstats['sources_ok']} / {sstats['sources_failed']} |",
         f"| Sponsors: pulled / matched / dead-link | {len(raw)} / {len(ats_fresh)} / {ats_dead} |",
         f"| Web (Adzuna): {web_status} | "
         f"{(str(wstats['fetched'])+' fetched, '+str(len(web_take))+' kept') if wstats else '—'} |",
-        f"| **Delivered today (target {DAILY_TARGET})** | **{delivered}** |",
+        f"| **New today (target {DAILY_TARGET})** | "
+        f"**{new_count}**  ({len(ats_take)} sponsors + {len(web_take)} web) |",
+        f"| Carryover still open / closed / archived | {len(carry_live)} / {closed} / {regated} |",
     ]
     lines = [f"# Jarvis Daily — {today}", "",
              f"**Target role:** {profile.get('target_role', '—')}{role_note}", "",
              "| Pipeline | Count |", "|---|---|", *stat_lines, "", "---", ""]
-    if carry_live:
-        lines.append(f"## 🔁 Carryover — still open ({len(carry_live)})\n")
-        for i in carry_live:
-            lines += _fmt_row(i + 1, rows[i])
     if ats_take:
         lines.append(f"## 🏢 New from your sponsor list ({len(ats_take)})\n")
         for k in range(len(ats_take)):
@@ -234,11 +231,17 @@ def daily_jobs() -> str:
         base = new_start + len(ats_take)
         for k in range(len(web_take)):
             lines += _fmt_row(base + k + 1, rows[base + k])
-    if delivered == 0:
-        lines.append("Nothing matched and survived verification today. No padding.")
+    if new_count == 0:
+        lines.append("No new matches survived verification today. No padding.")
+    if carry_live:
+        lines.append(f"\n---\n\n## 🔁 Carryover — still open from earlier days "
+                     f"({len(carry_live)}, not counted in the {DAILY_TARGET})\n")
+        for i in carry_live:
+            lines += _fmt_row(i + 1, rows[i])
 
     lines += ["---",
-              f"💬 'mark N applied' · 'tailor resume N' · {delivered}/{DAILY_TARGET} slots filled"]
+              f"💬 'mark N applied' · 'tailor resume N' · "
+              f"{new_count}/{DAILY_TARGET} new today · {len(carry_live)} carried over"]
     digest = "\n".join(lines)
     with open(JOBS_DIR / f"{today}_daily.md", "w") as f:
         f.write(digest + "\n")
