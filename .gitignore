@@ -1,0 +1,29 @@
+# secrets
+.env
+
+# personal data — never commit
+tracker.csv
+tracker*.csv
+*.bak
+# resume-derived role filter
+profile.yaml
+# your resume
+profile/*.docx
+# generated tailored resumes
+resumes/
+# generated daily digests
+jobs/
+# logs
+*.log
+
+# python / venv
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# editor / OS / local agent settings
+.DS_Store
+.claude/
+.idea/
+.vscode/

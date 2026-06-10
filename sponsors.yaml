@@ -1,0 +1,78 @@
+# sponsors.yaml — Jarvis v2 sponsor company registry.
+#
+# BUILD ONCE, REFRESH QUARTERLY. Source of truth for sponsorship:
+#   USCIS H-1B Employer Data Hub (downloadable CSV) and DOL LCA disclosure
+#   files. Do NOT scrape visa portals daily; this data changes quarterly.
+#
+# Every entry must be verified ONCE by opening the board URL:
+#   greenhouse: boards.greenhouse.io/<token>
+#   lever:      jobs.lever.co/<token>
+#   ashby:      jobs.ashbyhq.com/<token>
+#   workday:    <tenant>.<host>.myworkdayjobs.com/<site>
+# Entries marked VERIFY are best-guess slugs. A wrong slug fails loudly
+# in the run log; it never silently empties the list.
+#
+# type: direct | consultancy   (consultancies rank below direct in digest)
+
+companies:
+  # ---- Greenhouse (auto-apply supported by Jarvis submission layer)
+  - {name: Okta,        ats: greenhouse, token: okta,        type: direct}
+  - {name: GitLab,      ats: greenhouse, token: gitlab,      type: direct}
+  - {name: Reddit,      ats: greenhouse, token: reddit,      type: direct}
+  - {name: Robinhood,   ats: greenhouse, token: robinhood,   type: direct}
+  - {name: Amplitude,   ats: greenhouse, token: amplitude,   type: direct}
+  - {name: Ripple,      ats: greenhouse, token: ripple,      type: direct}
+  - {name: Carta,       ats: greenhouse, token: carta,       type: direct}
+  - {name: Datadog,     ats: greenhouse, token: datadog,     type: direct}
+  - {name: Stripe,      ats: greenhouse, token: stripe,      type: direct}   # VERIFY
+  - {name: Cloudflare,  ats: greenhouse, token: cloudflare,  type: direct}   # VERIFY
+  - {name: Databricks,  ats: greenhouse, token: databricks,  type: direct}   # VERIFY
+  - {name: Ping Identity, ats: greenhouse, token: pingidentity, type: direct}
+  - {name: Algolia,     ats: greenhouse, token: algolia,     type: direct}
+  - {name: Virtu Financial, ats: greenhouse, token: virtu,   type: direct}
+  - {name: Yext,        ats: greenhouse, token: yext,        type: direct}
+
+  # ---- added 2026-06-10 (token confirmed live via greenhouse board-name endpoint)
+  - {name: MongoDB,     ats: greenhouse, token: mongodb,     type: direct}
+  - {name: Elastic,     ats: greenhouse, token: elastic,     type: direct}
+  - {name: Twilio,      ats: greenhouse, token: twilio,      type: direct}
+  - {name: Zscaler,     ats: greenhouse, token: zscaler,     type: direct}
+  - {name: "Square (Block)", ats: greenhouse, token: block,  type: direct}
+  - {name: Coinbase,    ats: greenhouse, token: coinbase,    type: direct}
+  - {name: SoFi,        ats: greenhouse, token: sofi,        type: direct}
+  - {name: Affirm,      ats: greenhouse, token: affirm,      type: direct}
+  - {name: Marqeta,     ats: greenhouse, token: marqeta,     type: direct}
+  - {name: Chime,       ats: greenhouse, token: chime,       type: direct}
+  - {name: Brex,        ats: greenhouse, token: brex,        type: direct}
+  - {name: Instacart,   ats: greenhouse, token: instacart,   type: direct}
+  - {name: Flexport,    ats: greenhouse, token: flexport,    type: direct}
+  - {name: DoorDash,    ats: greenhouse, token: doordashusa, type: direct}
+
+  # ---- Lever (manual apply)
+  - {name: Crypto.com,  ats: lever, token: crypto,           type: direct}
+  - {name: Kraken,      ats: lever, token: kraken123,        type: direct}
+  - {name: Terawatt,    ats: lever, token: terawattinfrastructure, type: direct}
+
+  # ---- Ashby (manual apply)
+  - {name: Ramp,        ats: ashby, token: ramp,             type: direct}   # VERIFY
+  - {name: Linear,      ats: ashby, token: linear,           type: direct}   # VERIFY
+  - {name: Snowflake,   ats: ashby, token: snowflake,        type: direct}   # VERIFY owner — Ashby board (390 jobs), greenhouse slug doesn't exist
+
+  # ---- Workday (unofficial CXS endpoint, manual apply, may break)
+  # host is the wdN shard in the careers URL. All need one-time VERIFY.
+  - {name: NVIDIA,     ats: workday, tenant: nvidia,     host: wd5,  site: NVIDIAExternalCareerSite, type: direct}   # VERIFY
+  - {name: Salesforce, ats: workday, tenant: salesforce, host: wd12, site: External_Career_Site,     type: direct}   # VERIFY
+  - {name: Capital One, ats: workday, tenant: capitalone, host: wd12, site: Capital_One,             type: direct}   # VERIFY
+  - {name: Workday Inc, ats: workday, tenant: workday,   host: wd5,  site: Workday,                  type: direct}   # VERIFY
+  # ---- added 2026-06-10 (tenant/host/site resolved from careers URL + CXS-validated live)
+  - {name: CrowdStrike,   ats: workday, tenant: crowdstrike, host: wd5, site: crowdstrikecareers, type: direct}
+  - {name: GE HealthCare, ats: workday, tenant: gehc,        host: wd5, site: GEHC_ExternalSite,   type: direct}
+  - {name: Philips,       ats: workday, tenant: philips,     host: wd3, site: jobs-and-careers,     type: direct}
+  - {name: Medtronic,     ats: workday, tenant: medtronic,   host: wd1, site: medtronicCareers,     type: direct}
+
+  # ---- Consultancies (high ghost-rate segment; ranked below direct)
+  # Most run their own portals or Workday. Resolve each to its real ATS
+  # during one-time verification; entries below are placeholders to fill.
+  # - {name: Cognizant, ats: workday, tenant: cognizant, host: wd3, site: ..., type: consultancy}  # VERIFY
+  # - {name: Infosys,   ats: ???,  ...,                                        type: consultancy}  # VERIFY
+  # - {name: Deloitte,  ats: workday, ...,                                     type: consultancy}  # VERIFY
