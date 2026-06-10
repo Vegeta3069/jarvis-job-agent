@@ -78,7 +78,7 @@ A short shopping list. Don't worry — everything here is free.
 
 | What | Why you need it | Where to get it |
 |------|-----------------|-----------------|
-| A **Mac computer** | Jarvis runs on it | (you have one) |
+| A **Mac or Windows computer** | Jarvis runs on either | (you have one) |
 | The **Claude Desktop app** | Jarvis lives inside it | [claude.ai/download](https://claude.ai/download) |
 | Your **résumé as a Word file** (`.docx`) | So Jarvis knows what jobs suit you | Export from Word / Google Docs / Pages |
 | An **Anthropic key** (free) | Lets Jarvis read your résumé to learn your target role | [console.anthropic.com](https://console.anthropic.com) → API Keys |
@@ -96,6 +96,24 @@ search the wider web, add both keys. It's a 5-minute, one-time thing.
 ## Setup (do this once)
 
 Take it slow and do these in order. Each step says exactly what to type or click.
+
+> **On Windows?** Jarvis works exactly the same — only a few commands differ. Wherever a
+> step says **"Terminal"**, use **PowerShell** instead (click Start, type `PowerShell`,
+> press Enter). And swap in these Windows versions:
+>
+> | What | Mac version | Windows version |
+> |------|-------------|-----------------|
+> | Make the venv | `python3 -m venv .venv` | `python -m venv .venv` |
+> | Install / check | `./.venv/bin/python ...` | `.\.venv\Scripts\python ...` |
+> | The `"command"` path in the settings | `.../.venv/bin/python` | `...\.venv\Scripts\python.exe` |
+> | The settings file | `~/Library/Application Support/Claude/claude_desktop_config.json` | `%APPDATA%\Claude\claude_desktop_config.json` (paste that into File Explorer's address bar) |
+> | Copy your résumé in | `cp ~/Downloads/MyResume.docx profile/resume_base.docx` | `copy %USERPROFILE%\Downloads\MyResume.docx profile\resume_base.docx` |
+> | Show the folder path | `pwd` | `pwd` (works in PowerShell too) |
+>
+> In the settings file, write Windows paths with **double backslashes**, e.g.
+> `"C:\\Users\\you\\jarvis-job-agent\\.venv\\Scripts\\python.exe"` (forward slashes also
+> work). That's the only catch. The optional timed-run script (`run_daily.sh`) is Mac/Linux
+> only — on Windows use Task Scheduler if you ever want one, but you don't need it.
 
 ### Step 1 — Get the project onto your computer
 
