@@ -1,303 +1,336 @@
-# Jarvis — Résumé-Driven Job Hunter
+# Jarvis — Your Personal Job-Finding Assistant
 
-Jarvis is a personal job-sourcing agent that runs as an **MCP server inside Claude
-Desktop**. You drop in your résumé, and it surfaces fresh, real, apply-ready job
-postings for **your** role. The default mode pulls straight from companies' official
-Applicant Tracking System (ATS) feeds — no scraping, no dead links. An optional second
-mode searches the wider web (via the Adzuna jobs API) and holds every result to the
-same verification bar.
+Jarvis is a helper that lives inside the **Claude Desktop** app. Whenever you ask it to,
+it finds **real, recent job openings that match your résumé** — and it only ever shows you
+jobs that are genuinely worth your time.
 
-> **Résumé in → matched jobs out.** The company list is fixed; *which roles* get
-> matched is derived from your résumé. Swap the résumé, re-run setup, and the same
-> pipeline now hunts for a different role.
+You talk to it in plain English. You say **"wake up Jarvis"**, and a few seconds later you
+get a tidy list of up to **30 brand-new jobs**, each one checked to make sure it:
 
----
+- ✅ matches the kind of role on your résumé,
+- ✅ was posted in the **last 14 days**,
+- ✅ is located in the **United States**,
+- ✅ isn't a repeat of something you've already seen, and
+- ✅ has an **"Apply" link that actually works** (no dead pages, no fake listings).
 
-## Why it exists
+There's no schedule and no waiting — it runs **only when you ask it to**.
 
-Typical "job search" automation scrapes LinkedIn/Indeed/Google and saves a pile of
-dead links, ad redirects, duplicates, and stale postings. Jarvis takes the opposite
-approach:
-
-- **Sources only from official ATS APIs** (Greenhouse, Lever, Ashby, Workday). These
-  return *currently-open* requisitions with canonical apply URLs and real timestamps,
-  so dead links are structurally almost impossible.
-- **Validates every posting through 7 gates** before it ever reaches you.
-- **Never pads.** A thin day is a thin list — it tells you honestly what it rejected
-  and why, instead of inventing filler.
+> **You don't need to be technical to use this.** Follow the setup steps once (copy, paste,
+> click), and after that it's all plain-English conversation.
 
 ---
 
-## How it works
+## How it works (the simple version)
 
-**The daily run (`daily_jobs`) does this, in order:** re-verify your carryover → pull
-fresh jobs from your **sponsor list** → top up from the **web** (Adzuna) until you have
-up to **30** jobs. Every job in the final list matches your résumé profile, was posted
-within `max_age_days`, is US-based, is de-duplicated, and has a **verified-live apply
-link**. Sponsors fill the 30 first; the web fills whatever slots remain. Carryover (jobs
-still open from earlier days) is re-verified and shown in a **separate** section — it does
-*not* consume the 30, so you get up to **30 brand-new** jobs every day. The two sections
-below describe the shared machinery each stage uses.
+When you say **"wake up Jarvis"**, here's what happens behind the scenes:
 
 ```
-         your résumé                    sponsors.yaml (curated companies)
-              │                                      │
-        setup_profile                          fetch_all (ATS APIs)
-   (LLM derives role filter)                         │
-              │                                  raw postings
-        profile.yaml ───────────────┐                │
-                                     ▼                ▼
-                              ┌──────────────────────────────┐
-                              │  apply_gates (in order):      │
-                              │  1 domain  2 dedup  3 fresh    │
-                              │  4 title*  5 US-loc  6 elig    │   * from your résumé
-                              └──────────────┬───────────────┘
-                                             ▼
-                                   liveness check (HTTP)
-                                             ▼
-                              carryover re-check + cap (60)
-                                             ▼
-                          tracker.csv  +  jobs/<date>_jobs.md digest
+                        You say: "wake up Jarvis"
+                                   │
+                                   ▼
+        ┌───────────────────────────────────────────────┐
+        │  STEP 1 — Your favourite companies             │
+        │  Checks the company list you keep              │
+        │  (a file called sponsors.yaml)                 │
+        └───────────────────────┬───────────────────────┘
+                                 │  found some jobs
+                                 ▼
+        ┌───────────────────────────────────────────────┐
+        │  STEP 2 — The wider internet                   │
+        │  Searches the open web for more jobs           │
+        │  (only enough to top up to 30)                 │
+        └───────────────────────┬───────────────────────┘
+                                 │  more jobs
+                                 ▼
+        ┌───────────────────────────────────────────────┐
+        │  THE FILTER — every job checked one by one:    │
+        │     ✓ matches your résumé                      │
+        │     ✓ posted in the last 14 days               │
+        │     ✓ located in the US                        │
+        │     ✓ not a duplicate                          │
+        │     ✓ the Apply link really opens              │
+        │  (anything that fails is thrown away)          │
+        └───────────────────────┬───────────────────────┘
+                                 ▼
+               ┌─────────────────────────────────────┐
+               │   Up to 30 BRAND-NEW jobs for today  │
+               └─────────────────────────────────────┘
+                                 +
+        Jobs from earlier days you haven't applied to yet
+                 (shown in a separate list below)
 ```
 
-Each day (`find_jobs` / "wake up Jarvis"):
+**Two simple rules to remember:**
 
-1. **Carryover** — every unapplied job already in your tracker is re-screened against
-   your current role filter and re-checked for liveness; closed reqs are marked closed.
-2. **Fresh pull** — every company in `sponsors.yaml` is fetched from its ATS.
-3. **Gates** — domain allowlist → dedup → freshness → **title (your résumé filter)** →
-   US location → eligibility.
-4. **Liveness** — every surviving apply URL is HTTP-checked in parallel.
-5. **Deliver** — carryover + new, ranked freshest-first (direct employers above
-   consultancies), capped, with a full rejection breakdown. Written to the tracker and
-   a Markdown digest.
+1. **Your own company list comes first.** Jarvis fills today's 30 from your saved companies
+   first, then uses the wider web only to fill whatever's left over.
+2. **You always get up to 30 *new* jobs.** Jobs from previous days that you haven't applied
+   to yet are kept and shown in a *separate* list underneath — they never use up your 30.
+   As you apply to them (or they get filled and close), they drop off on their own.
 
-### The 7 gates
-
-| # | Gate | Rejects |
-|---|------|---------|
-| 1 | Domain allowlist | anything not on greenhouse.io / lever.co / ashbyhq.com / myworkdayjobs.com |
-| 2 | Dedup | canonical-URL duplicates (query strings stripped), within the batch and vs. the tracker |
-| 3 | Freshness | postings older than `max_age_days` (default 14), using the ATS timestamp — never scrape time |
-| 4 | Title | titles that don't match **your résumé's role filter** (`profile.yaml`) |
-| 5 | US location | non-US / unparseable locations (never defaults to "USA") |
-| 6 | Eligibility | clearance / TS-SCI / citizenship-required / ITAR (visa-ineligible) |
-| 7 | Liveness | apply URLs returning ≥400 or failing to resolve |
-
-### Internet-wide mode (`search_web_jobs`)
-
-`find_jobs` only sees the companies in `sponsors.yaml`. When you want to cast wider,
-`search_web_jobs` queries the **Adzuna jobs API** (one query per résumé keyword), then
-runs the results through the same bar:
-
-1. **Freshness** — Adzuna's real `created` date, ≤ `max_age_days`.
-2. **Title** — must match your résumé filter.
-3. **US** — Adzuna's country field (authoritative), with a location-string fallback.
-4. **Eligibility** — clearance / citizenship-gated roles dropped.
-5. **Dedup** — against this batch *and* everything already in your tracker.
-6. **Liveness** — every surviving apply link is HTTP-checked in parallel; anything that
-   doesn't resolve is dropped. This is the "verify every link before you see it" step.
-
-Only postings that clear all six are delivered, freshest-first, into the same tracker
-(tagged `ats: web`) and a `jobs/<date>_web_jobs.md` digest. The result is web-wide reach
-without the dead links and aggregator junk that raw web scraping produces.
+If a day only has 12 good jobs, you get 12. Jarvis never pads the list with junk to hit 30.
 
 ---
 
-## The tools (in Claude Desktop)
+## What you'll need before you start
 
-| Tool | What it does |
-|------|--------------|
-| `setup_profile` | Reads your résumé, derives your role filter → `profile.yaml`. **Run this first.** |
-| `daily_jobs` | **The daily run.** Up to **30 brand-new jobs/day** — sponsor list first, then the web, deduped + every link verified. Carryover shown separately (not counted in the 30). Trigger: *"wake up Jarvis."* |
-| `find_jobs` | Sponsor-list-only run (standalone variant of stage 1). |
-| `search_web_jobs` | Web-only run via the Adzuna API (standalone variant of stage 2). Needs `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`. |
-| `list_jobs` | List tracker rows (`today` / `all` / `pending` / a date). |
-| `mark_applied(n)` | Mark tracker row #n applied. |
-| `get_stats` | Totals, per-day found/applied, pipeline health. |
-| `open_digest` | Path to a day's Markdown digest. |
-| `tailor_resume(n)` | Generate a job-specific résumé DOCX for row #n (re-emphasis of real experience only — never fabricates). |
+A short shopping list. Don't worry — everything here is free.
 
----
+| What | Why you need it | Where to get it |
+|------|-----------------|-----------------|
+| A **Mac computer** | Jarvis runs on it | (you have one) |
+| The **Claude Desktop app** | Jarvis lives inside it | [claude.ai/download](https://claude.ai/download) |
+| Your **résumé as a Word file** (`.docx`) | So Jarvis knows what jobs suit you | Export from Word / Google Docs / Pages |
+| An **Anthropic key** (free) | Lets Jarvis read your résumé to learn your target role | [console.anthropic.com](https://console.anthropic.com) → API Keys |
+| An **Adzuna key** (free) | Lets Jarvis search the wider web for jobs | [developer.adzuna.com](https://developer.adzuna.com) → register |
 
-## Two search modes
+> A "key" is just a long password that lets Jarvis talk to another service on your behalf.
+> You'll paste them in once during setup and never think about them again.
 
-| | `find_jobs` (default) | `search_web_jobs` (opt-in) |
-|---|---|---|
-| Source | Your curated `sponsors.yaml` ATS feeds | The open web, via the Adzuna jobs API |
-| Reach | Exactly the companies you list | Internet-wide |
-| Junk control | Structurally clean (ATS-only) | Gated + **every link liveness-checked** |
-| Needs a key | No | Yes (free Adzuna key) |
-
-Both apply the **same** résumé-derived role filter, the same freshness/US/eligibility
-gates, the same dedup, and the same live-link verification — so the wide-net mode
-stays clean instead of dumping aggregator junk. Web finds land in the same tracker,
-tagged `ats: web`.
+You can actually start *without* the keys (Jarvis will use a default "DevOps/SRE" job filter
+and search only your saved companies), but to get jobs matched to **your** résumé and to
+search the wider web, add both keys. It's a 5-minute, one-time thing.
 
 ---
 
-## Install
+## Setup (do this once)
 
-### Prerequisites
-- **Python 3.11+**
-- **Claude Desktop** (this runs as an MCP server it launches)
-- An **Anthropic API key** (only needed for `setup_profile` and `tailor_resume`)
-- *Optional:* a free **Adzuna API key** (`app_id` + `app_key` from
-  [developer.adzuna.com](https://developer.adzuna.com)) — only for `search_web_jobs`
+Take it slow and do these in order. Each step says exactly what to type or click.
 
-### 1. Clone
-```bash
-git clone <your-repo-url> jarvis-job-agent
-cd jarvis-job-agent
-```
+### Step 1 — Get the project onto your computer
 
-### 2. Create a venv and install deps
+1. Open the **Terminal** app. (Press `Cmd + Space`, type `Terminal`, press Enter. A black or
+   white text window opens — that's where you type the commands below.)
+2. Copy-paste this line and press Enter to download the project to your home folder:
+   ```bash
+   git clone https://github.com/Vegeta3069/jarvis-job-agent.git
+   ```
+3. Move into the project folder:
+   ```bash
+   cd jarvis-job-agent
+   ```
+
+### Step 2 — Install Jarvis's building blocks
+
+Paste these one at a time (press Enter after each):
+
 ```bash
 python3 -m venv .venv
 ./.venv/bin/python -m pip install -r requirements.txt
-# sanity check:
+```
+
+Then check it worked — paste this and you should see `deps ok`:
+
+```bash
 ./.venv/bin/python -c "import mcp, yaml, requests, docx; print('deps ok')"
 ```
 
-### 3. Register it with Claude Desktop
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) and add
-a server. Point `command` at the venv's Python and `args` at `jarvis_mcp.py`:
+### Step 3 — Get your two free keys
+
+- **Anthropic key:** sign in at [console.anthropic.com](https://console.anthropic.com),
+  go to **API Keys**, click **Create Key**, and copy the long string (it starts with
+  `sk-ant-...`).
+- **Adzuna key:** register at [developer.adzuna.com](https://developer.adzuna.com). They
+  give you an **App ID** and an **App Key** — copy both.
+
+Keep these handy for the next step.
+
+### Step 4 — Connect Jarvis to Claude Desktop
+
+Jarvis plugs into Claude Desktop through one settings file. Open it by pasting this in
+Terminal:
+
+```bash
+open -e "$HOME/Library/Application Support/Claude/claude_desktop_config.json"
+```
+
+> If that file doesn't exist yet, create it: `touch "$HOME/Library/Application Support/Claude/claude_desktop_config.json"` and run the `open` command again.
+
+Paste in the block below. **Replace the two `REPLACE_WITH_...` paths and the three keys**
+with your real values, then save and close.
 
 ```json
 {
   "mcpServers": {
     "jarvis": {
-      "command": "/absolute/path/to/jarvis-job-agent/.venv/bin/python",
-      "args": ["/absolute/path/to/jarvis-job-agent/jarvis_mcp.py"],
+      "command": "REPLACE_WITH_FULL_PATH/jarvis-job-agent/.venv/bin/python",
+      "args": ["REPLACE_WITH_FULL_PATH/jarvis-job-agent/jarvis_mcp.py"],
       "env": {
-        "ANTHROPIC_API_KEY": "sk-ant-...",
-        "ADZUNA_APP_ID": "...",
-        "ADZUNA_APP_KEY": "..."
+        "ANTHROPIC_API_KEY": "sk-ant-...your key...",
+        "ADZUNA_APP_ID": "...your Adzuna app id...",
+        "ADZUNA_APP_KEY": "...your Adzuna app key..."
       }
     }
   }
 }
 ```
-Restart Claude Desktop.
 
-### 4. Drop in your résumé and build your profile
+To find the full path to write in place of `REPLACE_WITH_FULL_PATH`, paste this in Terminal
+and copy what it prints:
+
 ```bash
-cp /path/to/your_resume.docx profile/resume_base.docx   # exact filename
+pwd
 ```
-In Claude Desktop, run **`setup_profile`** (e.g. say *"set up my profile"*). It reads the
-résumé, derives your target role + title keywords, and writes `profile.yaml`.
 
-### 5. Search
-Say **"wake up Jarvis."** You'll get today's digest and the jobs land in `tracker.csv`.
+(For example it might print `/Users/yourname` — so the command line becomes
+`/Users/yourname/jarvis-job-agent/.venv/bin/python`.)
+
+### Step 5 — Add your résumé
+
+Put your résumé into the project's `profile` folder with this **exact** name. Replace the
+first path with where your résumé actually is:
+
+```bash
+cp ~/Downloads/MyResume.docx profile/resume_base.docx
+```
+
+### Step 6 — Wake up Claude and teach Jarvis about you
+
+1. **Quit and reopen Claude Desktop** (so it picks up the new settings).
+2. In a chat, type: **"set up my profile"**. Jarvis reads your résumé and figures out which
+   job titles to look for. You'll see it confirm your target role.
+3. That's it — type **"wake up Jarvis"** to get your first list of jobs.
+
+You only repeat Step 5 + "set up my profile" if you change your résumé later.
 
 ---
 
-## Usage — your daily workflow
+## Using Jarvis every day
 
-Everything is driven by natural language in Claude Desktop (the tool name in parentheses
-is what actually runs).
+Just talk to it. Here's everything you can say:
 
-**One-time, per résumé**
-- *"Set up my profile"* (`setup_profile`) — reads `profile/resume_base.docx`, writes
-  `profile.yaml`. Re-run whenever you update your résumé or want to re-target.
+| Say this | What happens |
+|----------|--------------|
+| **"wake up Jarvis"** | The main one. Gives you up to **30 brand-new jobs** (your companies first, then the web), plus any earlier jobs you haven't applied to. |
+| **"set up my profile"** | Re-reads your résumé and updates what roles Jarvis looks for. Do this after editing your résumé. |
+| **"list today's jobs"** / **"show my pending jobs"** | Shows your jobs as a numbered list. |
+| **"tailor my resume for #14"** | Writes a résumé tweaked for job #14 (it only re-emphasises things already on your résumé — it never makes things up). Saved in the `resumes` folder. |
+| **"mark 14 applied"** | Marks job #14 as applied so it stops showing up. |
+| **"show my stats"** | How many jobs you've found and applied to. |
+| **"search just my companies"** | Searches only your saved company list (skips the web). |
+| **"search just the web"** | Searches only the wider web (skips your company list). |
 
-**Every day**
-1. *"Wake up Jarvis"* (`daily_jobs`) — the combined run: sponsor list first, then the web,
-   giving up to **30 brand-new** jobs (deduped + every link verified); carryover from earlier
-   days is shown in a separate section, not counted in the 30. *(Standalone variants:
-   `find_jobs` = sponsors only, `search_web_jobs` = web only.)*
-2. *"List today's jobs"* / *"show pending"* (`list_jobs`) — numbered rows.
-3. *"Tailor my resume for #14"* (`tailor_resume(14)`) — writes a job-specific résumé DOCX
-   into `resumes/` (re-emphasis of real experience only — never fabricated).
-4. Apply, then *"mark 14 applied"* (`mark_applied(14)`).
-5. *"Show my stats"* (`get_stats`) — totals, per-day found/applied, pipeline health.
-
-> **Row numbers are permanent.** The `#N` in any digest or `list_jobs` is the tracker row
-> id — exactly what `mark_applied` and `tailor_resume` expect.
-
-### Reading a digest
-
-Every run prints an honest pipeline table *before* the jobs, e.g.:
-
-```
-| Raw postings pulled | 15330 |
-| Rejected: older than 14d / no date | 5752 |
-| Rejected: title mismatch | 9419 |
-| Rejected: non-US / no location | 82 |
-| Rejected: dead link | 0 |
-| **Delivered today** | **51** |
-```
-
-Nothing is dropped silently — every posting is either delivered or counted against the
-gate that rejected it. A thin day is a thin list; Jarvis never pads.
-
-### Without Claude (CLI)
-
-- `python apply.py list` · `list all` · `apply <n>` · `stats` — view or mark the tracker.
-- `./run_daily.sh` — runs the same `find_jobs` pipeline; wire it to cron/launchd for an
-  automatic morning run.
+> **The number matters.** Every job has a permanent number like `#14`. Use that number when
+> you say "tailor my resume for #14" or "mark 14 applied".
 
 ---
 
-## Customizing the company list
+## Understanding what Jarvis shows you
 
-`sponsors.yaml` is the registry of companies Jarvis searches. Each entry resolves to one
-ATS feed:
+Every run starts with a little scoreboard so you can trust the list. For example:
+
+```
+| New today (target 30)                     | 30  (8 from your companies + 22 from the web) |
+| Carryover still open / closed / archived  | 5 / 1 / 0 |
+...
+## 🏢 New from your sponsor list (8)
+## 🌐 New from the web — every link verified (22)
+---
+## 🔁 Carryover — still open from earlier days (5, not counted in the 30)
+```
+
+- **New today** — your 30 fresh jobs, split between your companies and the web.
+- **Carryover** — older jobs you haven't applied to. Shown separately, never counted in the 30.
+- **closed / archived** — jobs that disappeared (the posting was taken down) or no longer
+  match your résumé. Jarvis tidies these away automatically.
+
+Nothing is ever hidden: every job Jarvis looked at is either shown to you or counted as
+"rejected" for a clear reason (too old, wrong location, dead link, etc.).
+
+---
+
+## Customizing your list of companies
+
+The companies Jarvis checks **first** live in a file called `sponsors.yaml`. It already comes
+with 100+ well-known companies. To add your own, open the file and add a line like one of
+these:
 
 ```yaml
-companies:
   - {name: Stripe,    ats: greenhouse, token: stripe}
   - {name: Netflix,   ats: lever,      token: netflix}
   - {name: Snowflake, ats: ashby,      token: snowflake}
-  - {name: Medtronic, ats: workday, tenant: medtronic, host: wd1, site: medtronicCareers}
 ```
 
-- **Greenhouse / Lever / Ashby** need just a `token` (the board slug). Verify it by opening
-  `boards.greenhouse.io/<token>`, `jobs.lever.co/<token>`, or `jobs.ashbyhq.com/<token>`.
-- **Workday** needs `tenant`, `host` (the `wdN` shard), and `site` — read them out of the
-  careers URL: `https://<tenant>.<host>.myworkdayjobs.com/<site>`.
-- A bad slug **fails loudly** in the digest's "Failed sources" line; it never silently
-  empties the run. One broken company never aborts the others.
-
-> **Note:** Many large employers (Google, Meta, Netflix-corp, most Indian IT
-> consultancies, ServiceNow, etc.) run proprietary or non-public ATS portals and
-> **cannot** be sourced this way.
+The `token` is the company's name as it appears in its careers-page web address (e.g.
+`boards.greenhouse.io/stripe` → the token is `stripe`). If you get one wrong, Jarvis simply
+skips it and tells you — it never breaks the run. Not sure how? Just tell Jarvis the company
+name in chat and ask it to add it.
 
 ---
 
-## Daily automation (optional)
+## Your privacy
 
-`run_daily.sh` runs the exact same pipeline as `find_jobs` on a schedule. Point cron or a
-launchd agent at it:
-```bash
-0 8 * * *  /absolute/path/to/jarvis-job-agent/run_daily.sh
-```
-(Put `ANTHROPIC_API_KEY=...` in a local `.env` if the scheduled run needs `tailor_resume`.)
+Everything personal stays **on your computer only**:
 
----
-
-## Data & privacy
-
-Everything personal stays **local and git-ignored**: your résumé (`profile/`), derived
-filter (`profile.yaml`), tracked jobs (`tracker.csv`), generated résumés (`resumes/`),
-digests (`jobs/`), and `.env`. Only code + the company registry + examples are committed.
+- your résumé, the jobs you've tracked, your tailored résumés, and your keys are **never**
+  uploaded or shared, and are excluded from the public code.
+- The only things stored online are the program's code and the public company list.
 
 ---
 
-## Repo layout
+## Troubleshooting
 
-| File | Role |
-|------|------|
-| `jarvis_mcp.py` | MCP server: tools, tracker I/O, résumé profiling & tailoring |
-| `jarvis_sourcing.py` | ATS sourcing engine: adapters, the 7 gates, parallel fetch, profile loader |
-| `web_sourcing.py` | Internet-wide search via Adzuna + the verification gates (`search_web_jobs`) |
-| `sponsors.yaml` | The curated company → ATS registry |
-| `profile.example.yaml` | Shape of the generated `profile.yaml` |
-| `apply.py` | Standalone CLI to view/mark the tracker without Claude |
-| `job_agent.py` / `run_daily.sh` | Cron entrypoint (same pipeline as `find_jobs`) |
-| `requirements.txt` | `mcp`, `requests`, `pyyaml`, `python-docx` |
+**"Jarvis didn't appear / nothing happens when I say wake up Jarvis."**
+Make sure you fully quit and reopened Claude Desktop after Step 4. Double-check the two paths
+in the settings file point to the real `jarvis-job-agent` folder.
+
+**The jobs don't match my field (I'm not a DevOps engineer).**
+You haven't set your profile yet, so Jarvis is using its default filter. Add your Anthropic
+key (Step 3–4), put your résumé in place (Step 5), and say **"set up my profile."**
+
+**The scoreboard says "Web (Adzuna): skipped (no ADZUNA key)."**
+That just means the web half is off. Jarvis still gives you jobs from your company list. To
+turn on web search, add your Adzuna App ID + Key in the settings file (Step 4).
+
+**I got fewer than 30 jobs.**
+That's normal and honest — there just weren't 30 fresh, US, matching, working-link jobs today.
+Jarvis won't pad the list with junk.
+
+**A job's "Apply" link is dead.**
+Rare, but possible if a company puts up a "this job is closed" page that still loads. Tell
+Jarvis and it can be made stricter.
 
 ---
 
-*Built as a Claude Desktop MCP connector. Résumé tailoring uses the Anthropic API
-(`claude-sonnet-4-5`) and re-emphasizes only real experience — it never fabricates.*
+## Advanced (optional — you can ignore this)
+
+- **Run it from the command line** (no Claude): `python apply.py list`, `apply <n>`, or `stats`.
+- **Run it on a timer:** `run_daily.sh` performs the same daily run; you *can* schedule it
+  with cron/launchd, but this is entirely optional — by default Jarvis only runs when you ask.
+
+---
+
+## Under the hood (for the curious)
+
+Jarvis sources jobs **only** from official Applicant Tracking System (ATS) feeds
+(Greenhouse, Lever, Ashby, Workday) and the Adzuna jobs API — never by scraping search
+engines — which is why dead links and fake listings are almost impossible. Every posting
+passes these gates before you see it:
+
+| Gate | Rejects |
+|------|---------|
+| Domain allowlist | anything not from a real ATS / the jobs API |
+| Dedup | repeats (within the run and vs. everything you've already seen) |
+| Freshness | postings older than 14 days (using the real post date, never scrape time) |
+| Title | titles that don't match your résumé's role filter |
+| US location | non-US or unknown locations (never guesses "USA") |
+| Eligibility | clearance / citizenship-only roles (visa-ineligible) |
+| Liveness | apply links that don't open (checked live, in parallel) |
+
+### What's in this folder
+
+| File | What it is |
+|------|------------|
+| `jarvis_mcp.py` | The assistant itself — all the things you can say to it |
+| `jarvis_sourcing.py` | The engine that pulls + filters jobs from your company list |
+| `web_sourcing.py` | The engine that pulls + filters jobs from the wider web (Adzuna) |
+| `sponsors.yaml` | Your editable list of companies |
+| `profile.example.yaml` | Example of the résumé-derived filter Jarvis generates |
+| `apply.py` | Optional command-line way to view/mark your jobs |
+| `job_agent.py` / `run_daily.sh` | Optional way to run it on a schedule |
+| `requirements.txt` | The building blocks installed in Step 2 |
+
+---
+
+*Jarvis runs inside Claude Desktop. Résumé tailoring uses Anthropic's Claude and only
+re-emphasises real experience from your résumé — it never invents anything.*
