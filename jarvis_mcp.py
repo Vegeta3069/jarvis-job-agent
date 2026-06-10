@@ -39,7 +39,8 @@ SPONSORS_FILE = BASE_DIR / "sponsors.yaml"
 BASE_RESUME = PROFILE_DIR / "resume_base.docx"
 PROFILE_FILE = BASE_DIR / "profile.yaml"
 
-DAILY_CAP = 60
+DAILY_CAP = 60          # standalone find_jobs / search_web_jobs ceiling
+DAILY_TARGET = 30       # combined daily_jobs list size (sponsors first, then web)
 
 FIELDS = ["date_found", "title", "company", "location", "link", "status",
           "date_applied", "notes",
@@ -109,9 +110,146 @@ def _fmt_row(n: int, r: dict) -> list[str]:
 
 # ── MCP tools ────────────────────────────────────────────────────────────────
 @mcp.tool()
+def daily_jobs() -> str:
+    """
+    THE daily run — call this when the user says 'wake up Jarvis'. Produces ONE
+    merged list of up to 30 jobs, in this order:
+      1) re-verify carryover (still-open unapplied jobs already tracked)
+      2) fresh jobs from your sponsor list (sponsors.yaml ATS feeds)
+      3) fresh jobs from the web (Adzuna) to fill any remaining slots up to 30
+    Every job in the list matches your résumé profile, was posted within
+    max_age_days, is US-based, is de-duplicated, and has a verified-live apply
+    link. New finds are added to the tracker; a digest is written to
+    jobs/<date>_daily.md.
+    """
+    rows = _load_tracker()
+    profile = src.load_profile()
+    sess = src.new_session()
+    today = TODAY()
+
+    # 1) carryover: re-gate against the profile, then liveness-check
+    carry_idx = [i for i, r in enumerate(rows) if r["status"] == "not_applied"]
+    regated = 0
+    survivors = []
+    for i in carry_idx:
+        r = rows[i]
+        if src.passes_content_gates(r["title"], r["location"], profile):
+            survivors.append(i)
+        else:
+            r["status"] = "archived"
+            r["notes"] = (r["notes"] + " | " if r["notes"] else "") + \
+                         f"fails gates, archived {today}"
+            regated += 1
+    carry_objs = {i: src.Job(rows[i]["company"], rows[i]["title"], rows[i]["location"],
+                             rows[i]["link"], rows[i].get("ats", ""),
+                             rows[i].get("employer_type", "direct"), None,
+                             rows[i].get("apply_mode", "manual"))
+                  for i in survivors}
+    alive = {j.url for j in src.verify_live(sess, list(carry_objs.values()))}
+    closed = 0
+    for i in survivors:
+        if rows[i]["link"] not in alive:
+            rows[i]["status"] = "closed"
+            rows[i]["notes"] = (rows[i]["notes"] + " | " if rows[i]["notes"] else "") + \
+                               f"req closed, detected {today}"
+            closed += 1
+    carry_live = [i for i in survivors if rows[i]["link"] in alive]
+
+    known = {src.canonical(r["link"]) for r in rows if r.get("link")}
+    room = max(0, DAILY_TARGET - len(carry_live))
+
+    # 2) sponsor list first
+    try:
+        cfg = src.load_config(str(SPONSORS_FILE))
+    except FileNotFoundError:
+        cfg = {"companies": []}
+    raw, sstats = src.fetch_all(cfg, sess) if cfg.get("companies") else \
+        ([], {"sources_ok": 0, "sources_failed": 0, "failed_names": []})
+    gated, gstats = src.apply_gates(raw, known, profile)
+    ats_live = src.verify_live(sess, gated)
+    ats_dead = len(gated) - len(ats_live)
+    ats_fresh = src.rank(ats_live)
+    ats_take = ats_fresh[:room]
+    for j in ats_take:
+        known.add(src.canonical(j.url))
+
+    # 3) web fills any remaining slots
+    room2 = room - len(ats_take)
+    web_take, wstats, web_status = [], None, "not needed"
+    if room2 > 0:
+        try:
+            cands = web.search_adzuna(profile, max_days=profile["max_age_days"])
+            web_deliv, wstats = web.verify_and_gate(cands, known, profile, sess)
+            web_take = web_deliv[:room2]
+            web_status = "ok"
+        except RuntimeError:
+            web_status = "skipped (no ADZUNA key)"
+
+    # append new finds (sponsors then web)
+    new_start = len(rows)
+    for j in ats_take:
+        rows.append({
+            "date_found": today, "title": j.title, "company": j.company,
+            "location": j.location, "link": j.url, "status": "not_applied",
+            "date_applied": "", "notes": "",
+            "posted_at": j.posted_at.strftime("%Y-%m-%d") if j.posted_at else "",
+            "ats": j.ats, "employer_type": j.employer_type,
+            "apply_mode": j.apply_mode, "resume_file": "",
+        })
+    for c in web_take:
+        rows.append({
+            "date_found": today, "title": c["title"], "company": c["company"],
+            "location": c["location"], "link": c["url"], "status": "not_applied",
+            "date_applied": "", "notes": "web search",
+            "posted_at": c["posted"].strftime("%Y-%m-%d") if c["posted"] else "",
+            "ats": "web", "employer_type": "direct",
+            "apply_mode": "manual", "resume_file": "",
+        })
+    _save_tracker(rows)
+
+    delivered = len(carry_live) + len(ats_take) + len(web_take)
+    role_note = "" if PROFILE_FILE.exists() else \
+        "  _(default filter — run setup_profile with your resume to personalize)_"
+    stat_lines = [
+        f"| Carryover kept / closed / archived | {len(carry_live)} / {closed} / {regated} |",
+        f"| Sponsors: sources ok/fail | {sstats['sources_ok']} / {sstats['sources_failed']} |",
+        f"| Sponsors: pulled / matched / dead-link | {len(raw)} / {len(ats_fresh)} / {ats_dead} |",
+        f"| Web (Adzuna): {web_status} | "
+        f"{(str(wstats['fetched'])+' fetched, '+str(len(web_take))+' kept') if wstats else '—'} |",
+        f"| **Delivered today (target {DAILY_TARGET})** | **{delivered}** |",
+    ]
+    lines = [f"# Jarvis Daily — {today}", "",
+             f"**Target role:** {profile.get('target_role', '—')}{role_note}", "",
+             "| Pipeline | Count |", "|---|---|", *stat_lines, "", "---", ""]
+    if carry_live:
+        lines.append(f"## 🔁 Carryover — still open ({len(carry_live)})\n")
+        for i in carry_live:
+            lines += _fmt_row(i + 1, rows[i])
+    if ats_take:
+        lines.append(f"## 🏢 New from your sponsor list ({len(ats_take)})\n")
+        for k in range(len(ats_take)):
+            lines += _fmt_row(new_start + k + 1, rows[new_start + k])
+    if web_take:
+        lines.append(f"## 🌐 New from the web — every link verified ({len(web_take)})\n")
+        base = new_start + len(ats_take)
+        for k in range(len(web_take)):
+            lines += _fmt_row(base + k + 1, rows[base + k])
+    if delivered == 0:
+        lines.append("Nothing matched and survived verification today. No padding.")
+
+    lines += ["---",
+              f"💬 'mark N applied' · 'tailor resume N' · {delivered}/{DAILY_TARGET} slots filled"]
+    digest = "\n".join(lines)
+    with open(JOBS_DIR / f"{today}_daily.md", "w") as f:
+        f.write(digest + "\n")
+    return digest
+
+
+@mcp.tool()
 def find_jobs() -> str:
     """
-    Daily pipeline. Call this when the user says 'wake up Jarvis'.
+    Sponsor-list-only run (for the full daily run use daily_jobs, which also adds
+    web results). Searches just your sponsors.yaml ATS feeds, capped at DAILY_CAP.
     1) Re-verifies every carried-over unapplied job (closed reqs marked closed)
     2) Pulls fresh postings from sponsor companies' own ATS feeds (sponsors.yaml)
     3) Gates: domain, dedup, freshness, title, US location, eligibility. The

@@ -30,6 +30,15 @@ approach:
 
 ## How it works
 
+**The daily run (`daily_jobs`) does this, in order:** re-verify your carryover → pull
+fresh jobs from your **sponsor list** → top up from the **web** (Adzuna) until you have
+up to **30** jobs. Every job in the final list matches your résumé profile, was posted
+within `max_age_days`, is US-based, is de-duplicated, and has a **verified-live apply
+link**. Sponsors are filled first; the web only fills whatever slots remain. Carryover
+(jobs still open from earlier days) counts toward the 30 — as you mark jobs applied or
+reqs close, the freed slots refill with fresh finds. The two sections below describe the
+shared machinery each stage uses.
+
 ```
          your résumé                    sponsors.yaml (curated companies)
               │                                      │
@@ -100,8 +109,9 @@ without the dead links and aggregator junk that raw web scraping produces.
 | Tool | What it does |
 |------|--------------|
 | `setup_profile` | Reads your résumé, derives your role filter → `profile.yaml`. **Run this first.** |
-| `find_jobs` | The daily ATS pipeline above (your curated company list). Trigger: *"wake up Jarvis."* |
-| `search_web_jobs` | **Internet-wide** search via the Adzuna API — *separate* from `find_jobs`. Same quality bar (profile-matched, ≤ `max_age_days`, US, deduped) and **every apply link is liveness-checked before delivery**. Needs `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`. Trigger: *"search the web."* |
+| `daily_jobs` | **The daily run.** Sponsor list first, then the web — merged into one deduped, link-verified list of up to **30 jobs/day**. Trigger: *"wake up Jarvis."* |
+| `find_jobs` | Sponsor-list-only run (standalone variant of stage 1). |
+| `search_web_jobs` | Web-only run via the Adzuna API (standalone variant of stage 2). Needs `ADZUNA_APP_ID`/`ADZUNA_APP_KEY`. |
 | `list_jobs` | List tracker rows (`today` / `all` / `pending` / a date). |
 | `mark_applied(n)` | Mark tracker row #n applied. |
 | `get_stats` | Totals, per-day found/applied, pipeline health. |
@@ -192,14 +202,15 @@ is what actually runs).
   `profile.yaml`. Re-run whenever you update your résumé or want to re-target.
 
 **Every day**
-1. *"Wake up Jarvis"* (`find_jobs`) — searches your `sponsors.yaml` companies and returns a
-   digest of fresh, matched, live jobs; adds them to the tracker.
-2. *"Search the web"* (`search_web_jobs`) — optional wider sweep via Adzuna (needs the key).
-3. *"List today's jobs"* / *"show pending"* (`list_jobs`) — numbered rows.
-4. *"Tailor my resume for #14"* (`tailor_resume(14)`) — writes a job-specific résumé DOCX
+1. *"Wake up Jarvis"* (`daily_jobs`) — the combined run: sponsor list first, then the web,
+   merged into one deduped, link-verified list of up to **30** jobs; new ones added to the
+   tracker. *(Standalone variants if you want just one source: `find_jobs` = sponsors only,
+   `search_web_jobs` = web only.)*
+2. *"List today's jobs"* / *"show pending"* (`list_jobs`) — numbered rows.
+3. *"Tailor my resume for #14"* (`tailor_resume(14)`) — writes a job-specific résumé DOCX
    into `resumes/` (re-emphasis of real experience only — never fabricated).
-5. Apply, then *"mark 14 applied"* (`mark_applied(14)`).
-6. *"Show my stats"* (`get_stats`) — totals, per-day found/applied, pipeline health.
+4. Apply, then *"mark 14 applied"* (`mark_applied(14)`).
+5. *"Show my stats"* (`get_stats`) — totals, per-day found/applied, pipeline health.
 
 > **Row numbers are permanent.** The `#N` in any digest or `list_jobs` is the tracker row
 > id — exactly what `mark_applied` and `tailor_resume` expect.

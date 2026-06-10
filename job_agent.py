@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Cron entrypoint. Runs the exact same pipeline as the MCP find_jobs tool,
-so the 8 AM scheduled run and 'wake up Jarvis' produce identical results."""
+"""Cron entrypoint. Runs the same combined pipeline as the MCP daily_jobs tool
+(sponsor list first, then web), so the scheduled run and 'wake up Jarvis'
+produce the same daily list of up to 30 jobs."""
 import jarvis_mcp
-print(jarvis_mcp.find_jobs())
+print(jarvis_mcp.daily_jobs())
