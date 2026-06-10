@@ -293,22 +293,70 @@ Just talk to it. Here's everything you can say:
 
 ## Understanding what Jarvis shows you
 
-Every run starts with a little scoreboard so you can trust the list. For example:
+Every run gives you a clean, scannable report. Here's a **complete example** of what one
+`daily_jobs` run looks like (inside Claude Desktop it renders as nicely formatted text —
+clickable links, bold titles, the table laid out):
 
-```
-| New today (target 30)                     | 30  (8 from your companies + 22 from the web) |
+```text
+# Jarvis Daily — 2026-06-10
+
+**Target role:** Senior DevOps / SRE Engineer
+
+| Pipeline | Count |
+|---|---|
+| Sponsors: sources ok/fail                 | 112 / 0 |
+| Sponsors: pulled / matched / dead-link    | 15330 / 47 / 1 |
+| Web (Adzuna): ok                          | 240 fetched, 22 kept |
+| **New today (target 30)**                 | **30**  (8 sponsors + 22 web) |
 | Carryover still open / closed / archived  | 5 / 1 / 0 |
-...
-## 🏢 New from your sponsor list (8)
-## 🌐 New from the web — every link verified (22)
+
 ---
+
+## 🏢 New from your sponsor list (8)
+
+**#118. Senior Site Reliability Engineer** — Datadog
+   📍 New York, NY | 📅 posted 2026-06-09 | 🤖 auto | 🏢
+   🔗 https://boards.greenhouse.io/datadog/jobs/7183013
+
+**#119. Senior DevOps Engineer** — Stripe
+   📍 San Francisco, CA | 📅 posted 2026-06-08 | 🤖 auto | 🏢
+   🔗 https://boards.greenhouse.io/stripe/jobs/7532733
+
+   …6 more…
+
+## 🌐 New from the web — every link verified (22)
+
+**#126. Platform Engineer, Kubernetes** — Recursion
+   📍 Salt Lake City, UT | 📅 posted 2026-06-09 | 🖐 manual | 🏢
+   🔗 https://www.adzuna.com/land/ad/4983210155
+
+   …21 more…
+
+---
+
 ## 🔁 Carryover — still open from earlier days (5, not counted in the 30)
+
+**#94. Staff Site Reliability Engineer** — Okta
+   📍 Remote - US | 📅 posted 2026-06-02 | 🖐 manual | 🏢
+   🔗 https://boards.greenhouse.io/okta/jobs/7839826
+
+   …4 more…
+
+---
+💬 'mark N applied' · 'tailor resume N' · 30/30 new today · 5 carried over
 ```
 
-- **New today** — your 30 fresh jobs, split between your companies and the web.
-- **Carryover** — older jobs you haven't applied to. Shown separately, never counted in the 30.
-- **closed / archived** — jobs that disappeared (the posting was taken down) or no longer
-  match your résumé. Jarvis tidies these away automatically.
+**How to read it**
+
+- The **scoreboard** at the top is the honesty check: how many sources answered, how many raw
+  postings were pulled, how many survived, and how many were kept.
+- Each job line shows the **#number** (use it to say *"mark 118 applied"*), the title and
+  company, then 📍 location · 📅 real post date · the apply style (🤖 auto = one-click ATS,
+  🖐 manual) · 🏢 direct employer (vs 🏗 consultancy), and the 🔗 working apply link.
+- The three sections are always in this order: **your companies → the web → carryover**.
+
+- **closed / archived** in the scoreboard — jobs that disappeared (the posting was taken
+  down) or no longer match your résumé; Jarvis tidies these away automatically.
 
 Nothing is ever hidden: every job Jarvis looked at is either shown to you or counted as
 "rejected" for a clear reason (too old, wrong location, dead link, etc.).
