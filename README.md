@@ -2,9 +2,10 @@
 
 Jarvis is a personal job-sourcing agent that runs as an **MCP server inside Claude
 Desktop**. You drop in your résumé, and it surfaces fresh, real, apply-ready job
-postings for **your** role from a curated list of companies — pulled straight from
-those companies' official Applicant Tracking System (ATS) feeds, never from web
-search or job-board scraping.
+postings for **your** role. The default mode pulls straight from companies' official
+Applicant Tracking System (ATS) feeds — no scraping, no dead links. An optional second
+mode searches the wider web (via the Adzuna jobs API) and holds every result to the
+same verification bar.
 
 > **Résumé in → matched jobs out.** The company list is fixed; *which roles* get
 > matched is derived from your résumé. Swap the résumé, re-run setup, and the same
@@ -73,6 +74,24 @@ Each day (`find_jobs` / "wake up Jarvis"):
 | 5 | US location | non-US / unparseable locations (never defaults to "USA") |
 | 6 | Eligibility | clearance / TS-SCI / citizenship-required / ITAR (visa-ineligible) |
 | 7 | Liveness | apply URLs returning ≥400 or failing to resolve |
+
+### Internet-wide mode (`search_web_jobs`)
+
+`find_jobs` only sees the companies in `sponsors.yaml`. When you want to cast wider,
+`search_web_jobs` queries the **Adzuna jobs API** (one query per résumé keyword), then
+runs the results through the same bar:
+
+1. **Freshness** — Adzuna's real `created` date, ≤ `max_age_days`.
+2. **Title** — must match your résumé filter.
+3. **US** — Adzuna's country field (authoritative), with a location-string fallback.
+4. **Eligibility** — clearance / citizenship-gated roles dropped.
+5. **Dedup** — against this batch *and* everything already in your tracker.
+6. **Liveness** — every surviving apply link is HTTP-checked in parallel; anything that
+   doesn't resolve is dropped. This is the "verify every link before you see it" step.
+
+Only postings that clear all six are delivered, freshest-first, into the same tracker
+(tagged `ats: web`) and a `jobs/<date>_web_jobs.md` digest. The result is web-wide reach
+without the dead links and aggregator junk that raw web scraping produces.
 
 ---
 
@@ -160,7 +179,52 @@ résumé, derives your target role + title keywords, and writes `profile.yaml`.
 
 ### 5. Search
 Say **"wake up Jarvis."** You'll get today's digest and the jobs land in `tracker.csv`.
-Then use `mark_applied`, `tailor_resume`, etc.
+
+---
+
+## Usage — your daily workflow
+
+Everything is driven by natural language in Claude Desktop (the tool name in parentheses
+is what actually runs).
+
+**One-time, per résumé**
+- *"Set up my profile"* (`setup_profile`) — reads `profile/resume_base.docx`, writes
+  `profile.yaml`. Re-run whenever you update your résumé or want to re-target.
+
+**Every day**
+1. *"Wake up Jarvis"* (`find_jobs`) — searches your `sponsors.yaml` companies and returns a
+   digest of fresh, matched, live jobs; adds them to the tracker.
+2. *"Search the web"* (`search_web_jobs`) — optional wider sweep via Adzuna (needs the key).
+3. *"List today's jobs"* / *"show pending"* (`list_jobs`) — numbered rows.
+4. *"Tailor my resume for #14"* (`tailor_resume(14)`) — writes a job-specific résumé DOCX
+   into `resumes/` (re-emphasis of real experience only — never fabricated).
+5. Apply, then *"mark 14 applied"* (`mark_applied(14)`).
+6. *"Show my stats"* (`get_stats`) — totals, per-day found/applied, pipeline health.
+
+> **Row numbers are permanent.** The `#N` in any digest or `list_jobs` is the tracker row
+> id — exactly what `mark_applied` and `tailor_resume` expect.
+
+### Reading a digest
+
+Every run prints an honest pipeline table *before* the jobs, e.g.:
+
+```
+| Raw postings pulled | 15330 |
+| Rejected: older than 14d / no date | 5752 |
+| Rejected: title mismatch | 9419 |
+| Rejected: non-US / no location | 82 |
+| Rejected: dead link | 0 |
+| **Delivered today** | **51** |
+```
+
+Nothing is dropped silently — every posting is either delivered or counted against the
+gate that rejected it. A thin day is a thin list; Jarvis never pads.
+
+### Without Claude (CLI)
+
+- `python apply.py list` · `list all` · `apply <n>` · `stats` — view or mark the tracker.
+- `./run_daily.sh` — runs the same `find_jobs` pipeline; wire it to cron/launchd for an
+  automatic morning run.
 
 ---
 
@@ -214,7 +278,8 @@ digests (`jobs/`), and `.env`. Only code + the company registry + examples are c
 | File | Role |
 |------|------|
 | `jarvis_mcp.py` | MCP server: tools, tracker I/O, résumé profiling & tailoring |
-| `jarvis_sourcing.py` | Sourcing engine: ATS adapters, the 7 gates, profile loader |
+| `jarvis_sourcing.py` | ATS sourcing engine: adapters, the 7 gates, parallel fetch, profile loader |
+| `web_sourcing.py` | Internet-wide search via Adzuna + the verification gates (`search_web_jobs`) |
 | `sponsors.yaml` | The curated company → ATS registry |
 | `profile.example.yaml` | Shape of the generated `profile.yaml` |
 | `apply.py` | Standalone CLI to view/mark the tracker without Claude |
