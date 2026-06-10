@@ -213,23 +213,34 @@ def load_config(path: str) -> dict:
         return yaml.safe_load(f)
 
 
+def _fetch_one(sess: requests.Session, c: dict):
+    """Fetch a single company. Returns (company, jobs|None, error|None)."""
+    fn = ADAPTERS.get(c.get("ats"))
+    if not fn:
+        return c, None, "unknown ats"
+    try:
+        return c, fn(sess, c), None
+    except Exception as e:
+        return c, None, f"{type(e).__name__}: {e}"
+
+
 def fetch_all(cfg: dict, sess: requests.Session) -> tuple[list[Job], dict]:
+    """Fetch every company in parallel. One slow/broken feed never blocks or
+    aborts the rest — it just logs loudly and is counted as a failed source."""
+    companies = cfg.get("companies", [])
     raw, stats = [], {"sources_ok": 0, "sources_failed": 0, "failed_names": []}
-    for c in cfg.get("companies", []):
-        fn = ADAPTERS.get(c.get("ats"))
-        if not fn:
-            stats["sources_failed"] += 1
-            stats["failed_names"].append(f"{c.get('name')}(unknown ats)")
-            continue
-        try:
-            got = fn(sess, c)
-            print(f"[OK]   {c['name']:<18} {len(got):>4}", file=sys.stderr)
-            raw.extend(got)
-            stats["sources_ok"] += 1
-        except Exception as e:
-            print(f"[FAIL] {c['name']:<18} {type(e).__name__}: {e}", file=sys.stderr)
-            stats["sources_failed"] += 1
-            stats["failed_names"].append(c.get("name", "?"))
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        futs = [ex.submit(_fetch_one, sess, c) for c in companies]
+        for f in as_completed(futs):
+            c, got, err = f.result()
+            if err is None:
+                print(f"[OK]   {c['name']:<18} {len(got):>4}", file=sys.stderr)
+                raw.extend(got)
+                stats["sources_ok"] += 1
+            else:
+                print(f"[FAIL] {c['name']:<18} {err}", file=sys.stderr)
+                stats["sources_failed"] += 1
+                stats["failed_names"].append(c.get("name", "?"))
     return raw, stats
 
 

@@ -76,3 +76,77 @@ companies:
   # - {name: Cognizant, ats: workday, tenant: cognizant, host: wd3, site: ..., type: consultancy}  # VERIFY
   # - {name: Infosys,   ats: ???,  ...,                                        type: consultancy}  # VERIFY
   # - {name: Deloitte,  ats: workday, ...,                                     type: consultancy}  # VERIFY
+
+  # ---- expanded coverage 2026-06-10 (bulk-validated live; broader net, same gates)
+  # Greenhouse
+  - {name: "Abnormal", ats: greenhouse, token: abnormalsecurity, type: direct}
+  - {name: "Airbnb", ats: greenhouse, token: airbnb, type: direct}
+  - {name: "Airtable", ats: greenhouse, token: airtable, type: direct}
+  - {name: "Alloy", ats: greenhouse, token: alloy, type: direct}
+  - {name: "Anthropic", ats: greenhouse, token: anthropic, type: direct}
+  - {name: "Asana", ats: greenhouse, token: asana, type: direct}
+  - {name: "Betterment", ats: greenhouse, token: betterment, type: direct}
+  - {name: "Calendly", ats: greenhouse, token: calendly, type: direct}
+  - {name: "Carvana", ats: greenhouse, token: carvana, type: direct}
+  - {name: "Checkr", ats: greenhouse, token: checkr, type: direct}
+  - {name: "CircleCI", ats: greenhouse, token: circleci, type: direct}
+  - {name: "ClickHouse", ats: greenhouse, token: clickhouse, type: direct}
+  - {name: "Cockroach Labs", ats: greenhouse, token: cockroachlabs, type: direct}
+  - {name: "Cribl", ats: greenhouse, token: cribl, type: direct}
+  - {name: "Discord", ats: greenhouse, token: discord, type: direct}
+  - {name: "Doximity", ats: greenhouse, token: doximity, type: direct}
+  - {name: "Dropbox", ats: greenhouse, token: dropbox, type: direct}
+  - {name: "Faire", ats: greenhouse, token: faire, type: direct}
+  - {name: "Fastly", ats: greenhouse, token: fastly, type: direct}
+  - {name: "Figma", ats: greenhouse, token: figma, type: direct}
+  - {name: "Fivetran ", ats: greenhouse, token: fivetran, type: direct}
+  - {name: "Gemini", ats: greenhouse, token: gemini, type: direct}
+  - {name: "Grafana Labs", ats: greenhouse, token: grafanalabs, type: direct}
+  - {name: "Gusto, Inc.", ats: greenhouse, token: gusto, type: direct}
+  - {name: "Honeycomb.io", ats: greenhouse, token: honeycomb, type: direct}
+  - {name: "Huntress", ats: greenhouse, token: huntress, type: direct}
+  - {name: "Lattice", ats: greenhouse, token: lattice, type: direct}
+  - {name: "LaunchDarkly", ats: greenhouse, token: launchdarkly, type: direct}
+  - {name: "Lyft", ats: greenhouse, token: lyft, type: direct}
+  - {name: "Mercury", ats: greenhouse, token: mercury, type: direct}
+  - {name: "Mixpanel", ats: greenhouse, token: mixpanel, type: direct}
+  - {name: "Netlify", ats: greenhouse, token: netlify, type: direct}
+  - {name: "New Relic", ats: greenhouse, token: newrelic, type: direct}
+  - {name: "Nuro", ats: greenhouse, token: nuro, type: direct}
+  - {name: "PagerDuty", ats: greenhouse, token: pagerduty, type: direct}
+  - {name: "Pinterest", ats: greenhouse, token: pinterest, type: direct}
+  - {name: "PlanetScale", ats: greenhouse, token: planetscale, type: direct}
+  - {name: "Postman", ats: greenhouse, token: postman, type: direct}
+  - {name: "Roblox", ats: greenhouse, token: roblox, type: direct}
+  - {name: "Samsara", ats: greenhouse, token: samsara, type: direct}
+  - {name: "Scale AI", ats: greenhouse, token: scaleai, type: direct}
+  - {name: "Squarespace", ats: greenhouse, token: squarespace, type: direct}
+  - {name: "Starburst", ats: greenhouse, token: starburst, type: direct}
+  - {name: "StockX", ats: greenhouse, token: stockx, type: direct}
+  - {name: "Sumo Logic", ats: greenhouse, token: sumologic, type: direct}
+  - {name: "Tanium", ats: greenhouse, token: tanium, type: direct}
+  - {name: "Temporal Technologies", ats: greenhouse, token: temporaltechnologies, type: direct}
+  - {name: "Twitch", ats: greenhouse, token: twitch, type: direct}
+  - {name: "Unity Technologies", ats: greenhouse, token: unity3d, type: direct}
+  - {name: "Vercel", ats: greenhouse, token: vercel, type: direct}
+  - {name: "Verkada", ats: greenhouse, token: verkada, type: direct}
+  - {name: "Webflow", ats: greenhouse, token: webflow, type: direct}
+  # Lever
+  - {name: "Match Group", ats: lever, token: matchgroup, type: direct}
+  - {name: "Mistral AI", ats: lever, token: mistral, type: direct}
+  - {name: "Palantir", ats: lever, token: palantir, type: direct}
+  - {name: "Spotify", ats: lever, token: spotify, type: direct}
+  # Ashby
+  - {name: "Abridge", ats: ashby, token: abridge, type: direct}
+  - {name: "Baseten", ats: ashby, token: baseten, type: direct}
+  - {name: "Character.AI", ats: ashby, token: character, type: direct}
+  - {name: "Cursor", ats: ashby, token: cursor, type: direct}
+  - {name: "ElevenLabs", ats: ashby, token: elevenlabs, type: direct}
+  - {name: "Modal", ats: ashby, token: modal, type: direct}
+  - {name: "Notion", ats: ashby, token: notion, type: direct}
+  - {name: "OpenAI", ats: ashby, token: openai, type: direct}
+  - {name: "Perplexity", ats: ashby, token: perplexity, type: direct}
+  - {name: "Runway", ats: ashby, token: runway, type: direct}
+  - {name: "Sierra", ats: ashby, token: sierra, type: direct}
+  - {name: "Speak", ats: ashby, token: speak, type: direct}
+  - {name: "Watershed", ats: ashby, token: watershed, type: direct}
