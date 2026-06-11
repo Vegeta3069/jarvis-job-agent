@@ -48,6 +48,19 @@ def _parse_dt(s: str | None) -> dt.datetime | None:
         return None
 
 
+def _clean_location(loc: dict) -> str:
+    """Adzuna's display_name is often imprecise (e.g. 'Douglas, Juneau'). Its
+    `area` list is structured [country, state, county, city…], so prefer
+    'City, State' built from that, always surfacing the state."""
+    area = loc.get("area") or []
+    disp = (loc.get("display_name") or "").strip()
+    state = area[1].strip() if len(area) >= 2 else ""
+    if not state:
+        return disp or "United States"
+    city = disp.split(",")[0].strip() if disp else ""
+    return f"{city}, {state}" if city and city.lower() != state.lower() else state
+
+
 def search_adzuna(profile: dict, max_days: int = 14, per_page: int = 50,
                   log=print) -> list[dict]:
     """One query per resume title keyword; merged + de-duplicated by URL.
@@ -80,7 +93,7 @@ def search_adzuna(profile: dict, max_days: int = 14, per_page: int = 50,
             out.append({
                 "title": _TAG.sub("", j.get("title", "")).strip(),
                 "company": (j.get("company") or {}).get("display_name", "") or "",
-                "location": (j.get("location") or {}).get("display_name", "") or "",
+                "location": _clean_location(j.get("location") or {}),
                 "area": [a.lower() for a in (j.get("location") or {}).get("area", []) or []],
                 "url": url,
                 "posted": _parse_dt(j.get("created")),
